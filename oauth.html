@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'sha256-FM3X/f+dCA4QGdmyHrJ9TBseSdtSgPfs4Z4SRJb5yQc='; img-src 'none'; base-uri 'none'; form-action 'none'; script-src 'sha256-g2uoC33un4Es/cphT4fhF51BsWrIQwQ0zorHWCy/55o='">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<title>Facebook login · Alma &amp; Hermine Publishing Studio</title>
+<style>:root{color-scheme:dark}
+body{margin:0;background:#0f141b;color:#e6edf3;font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
+main{max-width:760px;margin:0 auto;padding:32px 20px 48px}
+h1{font-size:1.6rem;margin:0 0 .4rem}h2{font-size:1.15rem;margin:1.6rem 0 .4rem}
+a{color:#7cc4ff}p,li{color:#c9d4df}.muted{color:#8b98a5;font-size:.9rem}
+.box{background:#161d26;border:1px solid #2a3544;border-radius:10px;padding:16px 18px;margin:16px 0}
+.ok{color:#4caf50}.err{color:#ef5350}
+input{width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #2a3544;background:#0b1016;
+color:#e6edf3;font:14px ui-monospace,Consolas,monospace}
+button{margin-top:10px;padding:10px 16px;border:0;border-radius:8px;background:#2e7d32;color:#fff;font-weight:600;
+cursor:pointer}button[disabled]{opacity:.5;cursor:default}
+nav a{margin-right:14px}</style>
+</head>
+<body>
+<main>
+<h1>Facebook login</h1>
+<p class="muted">Alma &amp; Hermine Publishing Studio · this page never sends your login code anywhere</p>
+<div class="box">
+<p id="status">Checking the login…</p>
+<input id="code" type="password" readonly hidden autocomplete="off" aria-label="Login code">
+<button id="copy" type="button" hidden>Copy login code</button>
+</div>
+<p class="muted">The code works only once and only for a few minutes, and it is useless without the desktop
+application's secret. Do not share it or take screenshots of it. Close this tab after pasting.</p>
+<p class="muted"><a href="privacy.html">Privacy policy</a></p>
+
+</main>
+<script>(function () {
+  "use strict";
+  var TTL_MS = 10 * 60 * 1000;
+  function parseCallback(search, hash) {
+    var q = new URLSearchParams(search || "");
+    var h = new URLSearchParams(String(hash || "").replace(/^#/, ""));
+    function get(k) { return q.get(k) || h.get(k) || ""; }
+    var err = get("error_reason") || get("error");
+    if (err) {
+      return { ok: false, message: "Facebook login was cancelled or not granted (" +
+               err.replace(/[^A-Za-z0-9_ .-]/g, "").slice(0, 60) + ")." };
+    }
+    if (get("access_token")) {
+      return { ok: false, message: "Unexpected response type. Start the reconnect again from Publishing Studio." };
+    }
+    var state = get("state"), code = get("code");
+    if (!/^[A-Za-z0-9_-]{16,128}$/.test(state)) {
+      return { ok: false, message: "No valid login state. Start the reconnect again from Publishing Studio." };
+    }
+    if (!/^[A-Za-z0-9_.#=-]{20,4096}$/.test(code)) {
+      return { ok: false, message: "No authorization code received. Start the reconnect again from Publishing Studio." };
+    }
+    return { ok: true, value: "AHP1 " + state + " " + code.replace(/#.*$/, "") };
+  }
+  if (typeof module !== "undefined" && module.exports) { module.exports = parseCallback; return; }
+
+  var result = parseCallback(window.location.search, window.location.hash);
+  // remove the code from the address bar and the browser history immediately
+  try { window.history.replaceState(null, "", window.location.pathname); } catch (e) { /* ignore */ }
+  var status = document.getElementById("status");
+  var field = document.getElementById("code");
+  var copy = document.getElementById("copy");
+  if (!result.ok) {
+    status.className = "err";
+    status.textContent = result.message;
+    return;
+  }
+  status.className = "ok";
+  status.textContent = "Login approved. Copy the login code and paste it into Publishing Studio.";
+  field.value = result.value;
+  field.hidden = false;
+  copy.hidden = false;
+  var done = function (msg) {
+    status.textContent = msg;
+  };
+  copy.addEventListener("click", function () {
+    var v = field.value;
+    if (!v) { return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(v).then(function () {
+        done("Copied. Paste it into Publishing Studio, then close this tab.");
+      }, function () { manual(); });
+    } else { manual(); }
+  });
+  function manual() {
+    field.type = "text";
+    field.select();
+    try { document.execCommand("copy"); done("Copied. Paste it into Publishing Studio, then close this tab."); }
+    catch (e) { done("Select the code above and copy it (Ctrl+C)."); }
+    field.type = "password";
+  }
+  // the code is only valid for a short time: clear it from the page after 10 minutes
+  window.setTimeout(function () {
+    field.value = "";
+    field.hidden = true;
+    copy.hidden = true;
+    status.className = "err";
+    status.textContent = "This login code has expired. Start the reconnect again from Publishing Studio.";
+  }, TTL_MS);
+})();</script>
+</body>
+</html>
